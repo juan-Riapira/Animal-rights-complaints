@@ -1,0 +1,506 @@
+/* ── Denuncia.css ── NatuFauna */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+
+/* ── PAGE ── */
+.den-page {
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  background: #f3f7f0;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ── HEADER ── */
+.den-header {
+  max-width: 680px;
+  margin: 0 auto 2rem;
+}
+
+.den-eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #639922;
+  margin-bottom: 0.5rem;
+}
+
+.den-header h1 {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1a2e10;
+  margin: 0 0 0.4rem;
+  line-height: 1.2;
+}
+
+.den-header p {
+  font-size: 15px;
+  color: #6b7f60;
+  margin: 0;
+}
+
+/* ── STEPPER ── */
+.den-stepper {
+  max-width: 680px;
+  margin: 0 auto 1.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.den-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.den-step-circulo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #c8d9bc;
+  background: #fff;
+  color: #8fa07a;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.den-step.activo .den-step-circulo {
+  border-color: #639922;
+  background: #639922;
+  color: #fff;
+}
+
+.den-step.completo .den-step-circulo {
+  border-color: #3b6d11;
+  background: #3b6d11;
+  color: #fff;
+}
+
+.den-step-nombre {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8fa07a;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.den-step.activo .den-step-nombre  { color: #3b6d11; }
+.den-step.completo .den-step-nombre { color: #3b6d11; }
+
+.den-step-linea {
+  flex: 1;
+  height: 2px;
+  background: #c8d9bc;
+  margin: 0 8px;
+  border-radius: 2px;
+}
+
+.den-step.completo + .den-step .den-step-linea,
+.den-step.completo .den-step-linea {
+  background: #3b6d11;
+}
+
+/* ── CARD ── */
+.den-card {
+  max-width: 680px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #dce8d0;
+  padding: 2rem 2rem 1.5rem;
+  box-shadow: 0 4px 24px rgba(60, 100, 30, 0.07);
+}
+
+/* ── SECCIONES ── */
+.den-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.den-sec-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #edf2e8;
+}
+
+.den-sec-icono {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.den-sec-titulo h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a2e10;
+  margin: 0;
+}
+
+.den-subseccion {
+  background: #f6f9f2;
+  border: 1px solid #dce8d0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.den-subseccion h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #639922;
+  margin: 0;
+}
+
+.den-nota {
+  font-size: 13px;
+  color: #8fa07a;
+  background: #f6f9f2;
+  border-left: 3px solid #97c459;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin: 0;
+}
+
+/* ── CAMPOS ── */
+.den-fila-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.den-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.den-campo label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3d5c2a;
+}
+
+.den-req {
+  color: #c0392b;
+  margin-left: 2px;
+}
+
+.den-campo input,
+.den-campo select,
+.den-campo textarea {
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: #1a2e10;
+  background: #fafcf8;
+  border: 1.5px solid #c8d9bc;
+  border-radius: 10px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.den-campo input:focus,
+.den-campo select:focus,
+.den-campo textarea:focus {
+  border-color: #639922;
+  box-shadow: 0 0 0 3px rgba(99, 153, 34, 0.12);
+  background: #fff;
+}
+
+.den-campo textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.den-campo select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23639922' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.campo-error {
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1) !important;
+}
+
+.den-error-msg {
+  font-size: 12px;
+  color: #c0392b;
+  font-weight: 500;
+}
+
+/* ── EVIDENCIAS ── */
+.den-evidencias-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.den-evidencia-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.den-ev-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #eaf3de;
+  color: #3b6d11;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.den-evidencia-fila input {
+  flex: 1;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: #1a2e10;
+  background: #fafcf8;
+  border: 1.5px solid #c8d9bc;
+  border-radius: 10px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.den-evidencia-fila input:focus {
+  border-color: #639922;
+  box-shadow: 0 0 0 3px rgba(99, 153, 34, 0.12);
+  background: #fff;
+}
+
+.den-btn-eliminar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid #f5c6c6;
+  background: #fff5f5;
+  color: #c0392b;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.den-btn-eliminar:hover {
+  background: #fde8e8;
+}
+
+.den-btn-agregar {
+  align-self: flex-start;
+  background: transparent;
+  border: 1.5px dashed #97c459;
+  color: #3b6d11;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.den-btn-agregar:hover {
+  background: #eaf3de;
+}
+
+/* ── RESUMEN ── */
+.den-resumen {
+  background: #f6f9f2;
+  border: 1px solid #dce8d0;
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.den-resumen h3 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #639922;
+  margin: 0 0 1rem;
+}
+
+.den-resumen-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.den-resumen-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.den-resumen-grid span {
+  font-size: 11px;
+  color: #8fa07a;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.den-resumen-grid strong {
+  font-size: 14px;
+  color: #1a2e10;
+  font-weight: 600;
+}
+
+/* ── NAVEGACIÓN ── */
+.den-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #edf2e8;
+}
+
+.den-btn-prim {
+  background: #3b6d11;
+  color: #fff;
+  border: none;
+  padding: 11px 28px;
+  border-radius: 999px;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.den-btn-prim:hover:not(:disabled) {
+  background: #4d8f18;
+  transform: translateY(-1px);
+}
+
+.den-btn-prim:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.den-btn-sec {
+  background: transparent;
+  color: #639922;
+  border: 1.5px solid #c8d9bc;
+  padding: 11px 24px;
+  border-radius: 999px;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.den-btn-sec:hover {
+  border-color: #639922;
+  background: #f6f9f2;
+}
+
+/* ── ÉXITO ── */
+.den-exito {
+  max-width: 480px;
+  margin: 4rem auto 0;
+  text-align: center;
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #dce8d0;
+  padding: 3rem 2rem;
+  box-shadow: 0 4px 24px rgba(60, 100, 30, 0.07);
+}
+
+.den-exito-check {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #3b6d11;
+  color: #fff;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.den-exito h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a2e10;
+  margin-bottom: 0.75rem;
+}
+
+.den-exito p {
+  font-size: 15px;
+  color: #6b7f60;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .den-card {
+    padding: 1.5rem 1.25rem 1.25rem;
+    border-radius: 16px;
+  }
+
+  .den-fila-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .den-resumen-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .den-step-nombre {
+    display: none;
+  }
+}
+
+.checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.checkbox-inline input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.checkbox-inline span {
+  font-size: 16px;
+  font-weight: 600;
+  color: #365314;
+}

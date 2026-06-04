@@ -1,0 +1,172 @@
+/* PUBLICAR ADOPCIÓN - ESTILO FORMULARIO DENUNCIA */
+
+.publicar-adopcion-page {
+  min-height: 100vh;
+  background: #f3f8ef;
+  padding: 70px 20px;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+}
+
+.publicar-card {
+  max-width: 920px;
+  margin: 0 auto;
+  background: white;
+  border: 1px solid #d7e8cc;
+  border-radius: 28px;
+  padding: 44px;
+  box-shadow: 0 20px 45px rgba(23, 52, 4, 0.08);
+}
+
+.publicar-card h1 {
+  color: #173404;
+  font-size: 38px;
+  margin: 0 0 12px;
+}
+
+.publicar-card > p {
+  color: #607052;
+  font-size: 18px;
+  line-height: 1.7;
+  margin-bottom: 34px;
+}
+
+.publicar-card form {
+  display: grid;
+  gap: 22px;
+}
+
+.publicar-card input,
+.publicar-card select,
+.publicar-card textarea {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1.5px solid #c8d9bc;
+  border-radius: 16px;
+  background: #fbfdf9;
+  color: #173404;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: 0.25s;
+}
+
+.publicar-card textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.publicar-card input:focus,
+.publicar-card select:focus,
+.publicar-card textarea:focus {
+  border-color: #5f951f;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(95, 149, 31, 0.12);
+}
+
+.publicar-card h3 {
+  color: #173404;
+  margin: 14px 0 0;
+  font-size: 22px;
+}
+
+.foto-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.btn-eliminar-foto,
+.btn-agregar-foto,
+.publicar-card button[type="submit"] {
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 800;
+  transition: 0.25s;
+}
+
+.btn-eliminar-foto {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 14px 18px;
+}
+
+.btn-eliminar-foto:hover {
+  background: #fecaca;
+  transform: translateY(-2px);
+}
+
+.btn-agregar-foto {
+  background: #eaf3de;
+  color: #3b6d11;
+  padding: 15px 22px;
+  justify-self: start;
+}
+
+.btn-agregar-foto:hover {
+  background: #d9ecc8;
+  transform: translateY(-2px);
+}
+
+.checks-adopcion {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px;
+  border: 1px solid #e2eadc;
+  border-radius: 18px;
+  background: #f8fbf5;
+}
+
+.checks-adopcion label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #365314;
+  font-weight: 700;
+}
+
+.checks-adopcion input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: #3b6d11;
+}
+
+.publicar-card button[type="submit"] {
+  width: 100%;
+  padding: 18px;
+  background: #3b6d11;
+  color: white;
+  font-size: 17px;
+  margin-top: 10px;
+}
+
+.publicar-card button[type="submit"]:hover {
+  background: #4d8f18;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .publicar-adopcion-page {
+    padding: 30px 16px;
+  }
+
+  .publicar-card {
+    padding: 28px;
+  }
+
+  .publicar-card h1 {
+    font-size: 30px;
+  }
+
+  .foto-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-agregar-foto,
+  .btn-eliminar-foto {
+    width: 100%;
+  }
+}
