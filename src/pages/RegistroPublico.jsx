@@ -1,108 +1,118 @@
-import { useEffect, useState } from "react"
-
+import { useEffect, useState } from "react";
 import {
   getFirestore,
   collection,
   getDocs,
-} from "firebase/firestore"
+  query,
+  where,
+} from "firebase/firestore";
+import app from "../firebase/config";
+import "../Registro.css";
 
-import app from "../firebase/config"
-import "../Registro.css"
-
-const db = getFirestore(app)
+const db = getFirestore(app);
 
 function RegistroPublico() {
-  const [infractores, setInfractores] = useState([])
-  const [busqueda, setBusqueda] = useState("")
+  const [denunciasValidadas, setDenunciasValidadas] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
 
-  const obtenerInfractores = async () => {
-    const querySnapshot = await getDocs(
-      collection(db, "registroInfractores")
-    )
-
-    const lista = querySnapshot.docs.map((doc) => ({
+  const obtenerDenunciasValidadas = async () => {
+    // Traer denuncias con estado "Validada" o "Escalada"
+    const qValid = query(collection(db, "denuncias"), where("estado", "in", ["Validada", "Escalada"]));
+    const snapshot = await getDocs(qValid);
+    const lista = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    }))
-
-    setInfractores(lista)
-  }
+    }));
+    // Ordenar por fecha del caso descendente
+    lista.sort((a, b) => (b.fechaCaso || "").localeCompare(a.fechaCaso || ""));
+    setDenunciasValidadas(lista);
+  };
 
   useEffect(() => {
-    obtenerInfractores()
-  }, [])
+    obtenerDenunciasValidadas();
+  }, []);
 
-  const infractoresFiltrados = infractores.filter((infractor) => {
-    const textoBusqueda = busqueda.toLowerCase()
-
+  const denunciasFiltradas = denunciasValidadas.filter((den) => {
+    const texto = busqueda.toLowerCase();
     return (
-      infractor.nombre?.toLowerCase().includes(textoBusqueda) ||
-      infractor.documento?.toLowerCase().includes(textoBusqueda) ||
-      infractor.ciudad?.toLowerCase().includes(textoBusqueda)
-    )
-  })
+      den.tipoAnimal?.toLowerCase().includes(texto) ||
+      den.tipoMaltrato?.toLowerCase().includes(texto) ||
+      den.descripcion?.toLowerCase().includes(texto) ||
+      den.presuntoInfractor?.nombre?.toLowerCase().includes(texto) ||
+      den.presuntoInfractor?.documento?.toLowerCase().includes(texto) ||
+      den.ciudad?.toLowerCase().includes(texto)
+    );
+  });
 
-  const claseRiesgo = (riesgo) => {
-    if (riesgo === "Alto") return "riesgo-alto"
-    if (riesgo === "Medio") return "riesgo-medio"
-    return "riesgo-bajo"
-  }
+  const claseEstado = (estado) => {
+    if (estado === "Validada") return "estado-validada";
+    if (estado === "Escalada") return "estado-escalada";
+    return "";
+  };
+
+  const claseRiesgo = (prioridad) => {
+    if (prioridad === "Alta") return "riesgo-alto";
+    return "riesgo-bajo";
+  };
 
   return (
     <div className="registro-publico-page">
       <div className="registro-header">
-        <h1>🚨 Registro Público de Infractores</h1>
+        <h1>🚨 Registro Público de Casos Validados</h1>
         <p>
-          Consulta personas registradas por casos validados de maltrato animal.
+          Consulta las denuncias que han sido validadas o escaladas por maltrato animal.
         </p>
       </div>
 
       <div className="buscador-card">
         <input
           type="text"
-          placeholder="Buscar por nombre, documento o ciudad..."
+          placeholder="Buscar por animal, maltrato, infractor, ciudad..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
       </div>
 
       <div className="table-card">
-        <h2>Listado de infractores</h2>
+        <h2>Denuncias validadas y escaladas</h2>
 
-        {infractoresFiltrados.length === 0 ? (
-          <p>No se encontraron registros.</p>
+        {denunciasFiltradas.length === 0 ? (
+          <p>No se encontraron denuncias validadas.</p>
         ) : (
           <table className="denuncias-table">
             <thead>
               <tr>
-                <th>Nombre</th>
+                <th>Animal</th>
+                <th>Tipo maltrato</th>
+                <th>Infractor</th>
                 <th>Documento</th>
                 <th>Ciudad</th>
-                <th>Tipo de maltrato</th>
-                <th>Denuncias</th>
-                <th>Último caso</th>
+                <th>Descripción del caso</th>
+                <th>Fecha</th>
                 <th>Estado</th>
                 <th>Riesgo</th>
               </tr>
             </thead>
-
             <tbody>
-              {infractoresFiltrados.map((infractor) => (
-                <tr key={infractor.id}>
-                  <td>{infractor.nombre}</td>
-                  <td>{infractor.documento}</td>
-                  <td>{infractor.ciudad}</td>
-                  <td>{infractor.tipoMaltrato}</td>
-                  <td>{infractor.denuncias}</td>
-                  <td>{infractor.ultimoCaso}</td>
+              {denunciasFiltradas.map((den) => (
+                <tr key={den.id}>
+                  <td>{den.tipoAnimal || "—"}</td>
+                  <td>{den.tipoMaltrato || "—"}</td>
+                  <td>{den.presuntoInfractor?.nombre || "No registrado"}</td>
+                  <td>{den.presuntoInfractor?.documento || "No registrado"}</td>
+                  <td>{den.ciudad || "Sogamoso"}</td>
+                  <td style={{ maxWidth: "350px", wordBreak: "break-word" }}>
+                    {den.descripcion || "Sin descripción"}
+                  </td>
+                  <td>{den.fechaCaso || "—"}</td>
                   <td>
-                    <span className="estado-badge estado-validada">
-                      {infractor.estado}
+                    <span className={`estado-badge ${claseEstado(den.estado)}`}>
+                      {den.estado}
                     </span>
                   </td>
                   <td>
-                    <span className={`riesgo-badge ${claseRiesgo(infractor.nivelRiesgo)}`}>
-                      {infractor.nivelRiesgo}
+                    <span className={`riesgo-badge ${claseRiesgo(den.prioridad)}`}>
+                      {den.prioridad}
                     </span>
                   </td>
                 </tr>
@@ -112,7 +122,7 @@ function RegistroPublico() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
-export default RegistroPublico
+export default RegistroPublico;

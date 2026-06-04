@@ -591,3 +591,34 @@
     position: static;
   }
 }
+
+/* ===== Modal específico para agendar encuentro ===== */
+.modal-agendar {
+  max-width: 500px;
+}
+.modal-agendar .modal-body {
+  padding: 1.5rem;
+}
+.modal-agendar .detalle-seccion:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.campo-fecha {
+  margin: 0.5rem 0 0.2rem;
+}
+.input-datetime {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1.5px solid #c8d9bc;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+.input-datetime:focus {
+  border-color: #639922;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,153,34,0.15);
+}

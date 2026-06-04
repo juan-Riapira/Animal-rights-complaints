@@ -21,7 +21,7 @@ const auth = getAuth(app);
 
 function MisDenuncias() {
   // ---- Estado común ----
-  const [tabActiva, setTabActiva] = useState("denuncias"); // "denuncias" o "adopciones"
+  const [tabActiva, setTabActiva] = useState("denuncias");
   const [cargando, setCargando] = useState(null);
   const navigate = useNavigate();
 
@@ -46,7 +46,7 @@ function MisDenuncias() {
     datosEquino: { descripcionVehiculo: "", zonaHabitual: "", condicionAnimal: "" },
   });
 
-  // ---- Estados para solicitudes de adopción ----
+  // ---- Estados para solicitudes ----
   const [solicitudes, setSolicitudes] = useState([]);
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState(null);
   const [busquedaSolicitudes, setBusquedaSolicitudes] = useState("");
@@ -64,7 +64,27 @@ function MisDenuncias() {
     motivo: "",
   });
 
-  // ==================== FUNCIONES PARA DENUNCIAS ====================
+  // ---- Modal de confirmación personalizado ----
+  const [confirmModal, setConfirmModal] = useState({
+    visible: false,
+    onConfirm: null,
+    message: "",
+    itemId: null,
+    tipo: null,
+  });
+
+  // ---- Toasts ----
+  const [toasts, setToasts] = useState([]);
+  const addToast = (message, type = "info") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => removeToast(id), 4000);
+  };
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
+
+  // ==================== DENUNCIAS ====================
   const obtenerMisDenuncias = async (usuario) => {
     const q = query(collection(db, "denuncias"), where("denuncianteId", "==", usuario.uid));
     const snap = await getDocs(q);
@@ -106,16 +126,15 @@ function MisDenuncias() {
     setDenunciaSeleccionada(denuncia);
   };
 
-  const cancelarDenuncia = async (denuncia) => {
-    const confirmar = window.confirm("¿Estás seguro de cancelar esta denuncia? Esta acción no se puede deshacer.");
-    if (!confirmar) return;
+  const ejecutarCancelarDenuncia = async (id) => {
     try {
-      await updateDoc(doc(db, "denuncias", denuncia.id), { estado: "Cancelada" });
+      await updateDoc(doc(db, "denuncias", id), { estado: "Cancelada" });
       const user = auth.currentUser;
       if (user) obtenerMisDenuncias(user);
-      setDenunciaSeleccionada(null);
+      setConfirmModal({ visible: false, onConfirm: null, message: "", itemId: null, tipo: null });
+      addToast("Denuncia cancelada correctamente", "success");
     } catch (error) {
-      alert("Error al cancelar: " + error.message);
+      addToast("Error al cancelar: " + error.message, "error");
     }
   };
 
@@ -141,13 +160,13 @@ function MisDenuncias() {
       if (user) obtenerMisDenuncias(user);
       setDenunciaSeleccionada(null);
       setEditandoDenuncia(false);
-      alert("Denuncia actualizada correctamente");
+      addToast("Denuncia actualizada correctamente", "success");
     } catch (error) {
-      alert("Error al guardar: " + error.message);
+      addToast("Error al guardar: " + error.message, "error");
     }
   };
 
-  // ==================== FUNCIONES PARA SOLICITUDES ====================
+  // ==================== SOLICITUDES ====================
   const obtenerMisSolicitudes = async (usuario) => {
     const q = query(collection(db, "solicitudesAdopcion"), where("solicitanteId", "==", usuario.uid));
     const snap = await getDocs(q);
@@ -178,20 +197,15 @@ function MisDenuncias() {
     setSolicitudSeleccionada(solicitud);
   };
 
-  const cancelarSolicitud = async (solicitud) => {
-    if (solicitud.estado !== "Pendiente") {
-      alert("Solo puedes cancelar solicitudes que estén pendientes.");
-      return;
-    }
-    const confirmar = window.confirm("¿Cancelar esta solicitud de adopción?");
-    if (!confirmar) return;
+  const ejecutarCancelarSolicitud = async (id) => {
     try {
-      await updateDoc(doc(db, "solicitudesAdopcion", solicitud.id), { estado: "Cancelada" });
+      await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Cancelada" });
       const user = auth.currentUser;
       if (user) obtenerMisSolicitudes(user);
-      setSolicitudSeleccionada(null);
+      setConfirmModal({ visible: false, onConfirm: null, message: "", itemId: null, tipo: null });
+      addToast("Solicitud cancelada", "success");
     } catch (error) {
-      alert("Error al cancelar: " + error.message);
+      addToast("Error al cancelar: " + error.message, "error");
     }
   };
 
@@ -215,9 +229,9 @@ function MisDenuncias() {
       if (user) obtenerMisSolicitudes(user);
       setSolicitudSeleccionada(null);
       setEditandoSolicitud(false);
-      alert("Solicitud actualizada correctamente");
+      addToast("Solicitud actualizada correctamente", "success");
     } catch (error) {
-      alert("Error al actualizar: " + error.message);
+      addToast("Error al actualizar: " + error.message, "error");
     }
   };
 
@@ -235,7 +249,7 @@ function MisDenuncias() {
     return () => unsubscribe();
   }, []);
 
-  // ==================== RENDERIZADO CONDICIONAL ====================
+  // ==================== RENDER ====================
   const claseEstadoDenuncia = (estado) => {
     if (estado === "Validada") return "badge-validada";
     if (estado === "Escalada") return "badge-escalada";
@@ -297,6 +311,35 @@ function MisDenuncias() {
 
   return (
     <div className="md-page">
+      {/* Contenedor de toasts */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            <span className="toast-message">{toast.message}</span>
+            <button className="toast-close" onClick={() => removeToast(toast.id)}>×</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal de confirmación personalizado */}
+      {confirmModal.visible && (
+        <div className="modal-overlay" onClick={() => setConfirmModal({ ...confirmModal, visible: false })}>
+          <div className="modal-content modal-confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">⚠️</span>
+              <h2>Confirmar acción</h2>
+            </div>
+            <div className="modal-body">
+              <p>{confirmModal.message}</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancelar-modal" onClick={() => setConfirmModal({ ...confirmModal, visible: false })}>No</button>
+              <button className="btn-guardar-modal" onClick={() => confirmModal.onConfirm(confirmModal.itemId)}>Sí, cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="md-header">
         <div className="md-header-texto">
           <span className="md-eyebrow">Mi panel</span>
@@ -305,34 +348,20 @@ function MisDenuncias() {
         </div>
         <div className="md-header-buttons">
           {tabActiva === "denuncias" ? (
-            <Link to="/denuncia" className="md-btn-nueva">
-              + Nueva denuncia
-            </Link>
+            <Link to="/denuncia" className="md-btn-nueva">+ Nueva denuncia</Link>
           ) : (
-            <Link to="/adopciones" className="md-btn-nueva">
-              + Solicitar adopción
-            </Link>
+            <Link to="/adopciones" className="md-btn-nueva">+ Solicitar adopción</Link>
           )}
         </div>
       </div>
 
       {/* TABS */}
       <div className="admin-tabs" style={{ marginBottom: "1.75rem" }}>
-        <button
-          className={tabActiva === "denuncias" ? "active-tab" : ""}
-          onClick={() => setTabActiva("denuncias")}
-        >
-          📋 Mis denuncias
-        </button>
-        <button
-          className={tabActiva === "adopciones" ? "active-tab" : ""}
-          onClick={() => setTabActiva("adopciones")}
-        >
-          🐾 Solicitudes de adopción
-        </button>
+        <button className={tabActiva === "denuncias" ? "active-tab" : ""} onClick={() => setTabActiva("denuncias")}>📋 Mis denuncias</button>
+        <button className={tabActiva === "adopciones" ? "active-tab" : ""} onClick={() => setTabActiva("adopciones")}>🐾 Solicitudes de adopción</button>
       </div>
 
-      {/* ========== CONTENIDO DENUNCIAS ========== */}
+      {/* ========== TABLA DENUNCIAS ========== */}
       {tabActiva === "denuncias" && (
         <>
           <div className="md-stats">
@@ -345,59 +374,35 @@ function MisDenuncias() {
           <div className="md-card">
             <div className="md-card-top">
               <h2>Historial de denuncias</h2>
-              <input
-                className="md-busqueda"
-                type="text"
-                placeholder="Buscar por animal, maltrato, dirección..."
-                value={busquedaDenuncias}
-                onChange={(e) => setBusquedaDenuncias(e.target.value)}
-              />
+              <input className="md-busqueda" type="text" placeholder="Buscar..." value={busquedaDenuncias} onChange={(e) => setBusquedaDenuncias(e.target.value)} />
             </div>
-
             {denunciasFiltradas.length === 0 ? (
-              <div className="md-vacio">
-                <span className="md-vacio-icono">📋</span>
-                <p>{busquedaDenuncias ? "Sin resultados para tu búsqueda." : "Aún no tienes denuncias registradas."}</p>
-                {!busquedaDenuncias && <Link to="/denuncia" className="md-btn-nueva">Crear primera denuncia</Link>}
-              </div>
+              <div className="md-vacio"><span className="md-vacio-icono">📋</span><p>{busquedaDenuncias ? "Sin resultados." : "Aún no tienes denuncias."}</p></div>
             ) : (
               <div className="md-tabla-wrap">
                 <table className="md-tabla">
                   <thead>
-                    <tr>
-                      <th>Código</th>
-                      <th>Tipo</th>
-                      <th>Animal</th>
-                      <th>Dirección</th>
-                      <th>Fecha</th>
-                      <th>Estado</th>
-                      <th>Evidencias</th>
-                      <th></th>
-                    </tr>
+                    <tr><th>Código</th><th>Tipo</th><th>Animal</th><th>Dirección</th><th>Fecha</th><th>Estado</th><th>Evidencias</th><th></th></tr>
                   </thead>
                   <tbody>
-                    {denunciasFiltradas.map((denuncia, index) => (
-                      <tr key={denuncia.id}>
-                        <td><span className="md-codigo">#DEN-{String(index + 1).padStart(4, "0")}</span></td>
-                        <td>{denuncia.tipoMaltrato}</td>
-                        <td>{denuncia.tipoAnimal}</td>
-                        <td className="md-direccion">{denuncia.direccion}</td>
-                        <td>{denuncia.fechaCaso}</td>
-                        <td><span className={`md-badge ${claseEstadoDenuncia(denuncia.estado)}`}>{denuncia.estado}</span></td>
+                    {denunciasFiltradas.map((d, idx) => (
+                      <tr key={d.id}>
+                        <td><span className="md-codigo">#DEN-{String(idx+1).padStart(4,"0")}</span></td>
+                        <td>{d.tipoMaltrato}</td>
+                        <td>{d.tipoAnimal}</td>
+                        <td className="md-direccion">{d.direccion}</td>
+                        <td>{d.fechaCaso}</td>
+                        <td><span className={`md-badge ${claseEstadoDenuncia(d.estado)}`}>{d.estado}</span></td>
                         <td>
-                          {denuncia.evidencias?.length > 0 ? (
-                            <div className="md-evidencias">
-                              {denuncia.evidencias.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noreferrer" className="md-ev-link">Ver {i+1}</a>
-                              ))}
-                            </div>
+                          {d.evidencias?.length ? (
+                            <div className="md-evidencias">{d.evidencias.map((u,i)=><a key={i} href={u} className="md-ev-link">Ver {i+1}</a>)}</div>
                           ) : <span className="md-sin-ev">—</span>}
                         </td>
                         <td>
                           <div className="md-acciones">
-                            <button className="md-btn-detalle" onClick={() => verDetalleDenuncia(denuncia)}>Detalle</button>
-                            <button className="md-btn-editar" onClick={() => editarDenuncia(denuncia)}>Editar</button>
-                            <button className="md-btn-cancelar" onClick={() => cancelarDenuncia(denuncia)}>Cancelar</button>
+                            <button className="md-btn-detalle" onClick={() => verDetalleDenuncia(d)}>Detalle</button>
+                            <button className="md-btn-editar" onClick={() => editarDenuncia(d)}>Editar</button>
+                            <button className="md-btn-cancelar" onClick={() => setConfirmModal({ visible: true, onConfirm: ejecutarCancelarDenuncia, message: "¿Estás seguro de cancelar esta denuncia?", itemId: d.id, tipo: "denuncia" })}>Cancelar</button>
                           </div>
                         </td>
                       </tr>
@@ -407,89 +412,10 @@ function MisDenuncias() {
               </div>
             )}
           </div>
-
-          {/* Modal de Denuncia */}
-          {denunciaSeleccionada && (
-            <div className="md-modal-fondo" onClick={() => setDenunciaSeleccionada(null)}>
-              <div className="md-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="md-modal-header">
-                  <div>
-                    <span className="md-eyebrow">{editandoDenuncia ? "Editar reporte" : "Reporte completo"}</span>
-                    <h2>{editandoDenuncia ? "Editar denuncia" : "Detalle de la denuncia"}</h2>
-                  </div>
-                  <button className="md-btn-cerrar" onClick={() => setDenunciaSeleccionada(null)}>×</button>
-                </div>
-                <div className="md-modal-body">
-                  <div className="md-modal-seccion">
-                    <h3>Animal y maltrato</h3>
-                    <div className="md-modal-grid">
-                      <div><span>Tipo de animal</span>{editandoDenuncia ? <input value={formEditDenuncia.tipoAnimal} onChange={e => setFormEditDenuncia({...formEditDenuncia, tipoAnimal: e.target.value})} /> : <strong>{denunciaSeleccionada.tipoAnimal}</strong>}</div>
-                      <div><span>Tipo de maltrato</span>{editandoDenuncia ? <input value={formEditDenuncia.tipoMaltrato} onChange={e => setFormEditDenuncia({...formEditDenuncia, tipoMaltrato: e.target.value})} /> : <strong>{denunciaSeleccionada.tipoMaltrato}</strong>}</div>
-                      <div><span>Fecha</span>{editandoDenuncia ? <input type="date" value={formEditDenuncia.fechaCaso} onChange={e => setFormEditDenuncia({...formEditDenuncia, fechaCaso: e.target.value})} /> : <strong>{denunciaSeleccionada.fechaCaso}</strong>}</div>
-                      <div><span>Estado</span><span className={`md-badge ${claseEstadoDenuncia(denunciaSeleccionada.estado)}`}>{denunciaSeleccionada.estado}</span></div>
-                      <div><span>Prioridad</span><strong>{denunciaSeleccionada.prioridad}</strong></div>
-                      <div><span>Dirección</span>{editandoDenuncia ? <input value={formEditDenuncia.direccion} onChange={e => setFormEditDenuncia({...formEditDenuncia, direccion: e.target.value})} /> : <strong>{denunciaSeleccionada.direccion}</strong>}</div>
-                    </div>
-                    <div className="md-descripcion">
-                      <span>Descripción</span>
-                      {editandoDenuncia ? <textarea rows={3} value={formEditDenuncia.descripcion} onChange={e => setFormEditDenuncia({...formEditDenuncia, descripcion: e.target.value})} /> : <p>{denunciaSeleccionada.descripcion || "Sin descripción"}</p>}
-                    </div>
-                  </div>
-                  <div className="md-modal-seccion">
-                    <h3>Presunto infractor</h3>
-                    <div className="md-modal-grid">
-                      {["nombre", "documento", "ciudad", "telefono", "correo"].map(campo => (
-                        <div key={campo}>
-                          <span>{campo.charAt(0).toUpperCase() + campo.slice(1)}</span>
-                          {editandoDenuncia ? <input value={formEditDenuncia.presuntoInfractor[campo]} onChange={e => setFormEditDenuncia({...formEditDenuncia, presuntoInfractor: {...formEditDenuncia.presuntoInfractor, [campo]: e.target.value}})} /> : <strong>{denunciaSeleccionada.presuntoInfractor?.[campo] || "No registrado"}</strong>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="md-modal-seccion">
-                    <h3>Evidencias</h3>
-                    {editandoDenuncia ? (
-                      <div className="edit-evidencias">
-                        {formEditDenuncia.evidencias.map((url, idx) => (
-                          <div key={idx} className="edit-evidencia-fila">
-                            <input type="url" value={url} onChange={e => { const newEv = [...formEditDenuncia.evidencias]; newEv[idx] = e.target.value; setFormEditDenuncia({...formEditDenuncia, evidencias: newEv}); }} />
-                            <button onClick={() => { const newEv = formEditDenuncia.evidencias.filter((_, i) => i !== idx); setFormEditDenuncia({...formEditDenuncia, evidencias: newEv.length ? newEv : [""]}); }}>×</button>
-                          </div>
-                        ))}
-                        <button className="md-btn-agregar-evid" onClick={() => setFormEditDenuncia({...formEditDenuncia, evidencias: [...formEditDenuncia.evidencias, ""]})}>+ Agregar enlace</button>
-                      </div>
-                    ) : (
-                      denunciaSeleccionada.evidencias?.length > 0 ? (
-                        <div className="md-modal-evidencias">
-                          {denunciaSeleccionada.evidencias.map((url, i) => <a key={i} href={url} target="_blank" rel="noreferrer" className="md-modal-ev-link">🔗 Evidencia {i+1}</a>)}
-                        </div>
-                      ) : <p className="md-sin-ev">No hay evidencias registradas.</p>
-                    )}
-                  </div>
-                  {denunciaSeleccionada.esEquino && (
-                    <div className="md-modal-seccion">
-                      <h3>Datos equino / zorrero</h3>
-                      <div className="md-modal-grid">
-                        <div><span>Vehículo</span>{editandoDenuncia ? <input value={formEditDenuncia.datosEquino.descripcionVehiculo} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, descripcionVehiculo: e.target.value}})} /> : <strong>{denunciaSeleccionada.datosEquino?.descripcionVehiculo || "—"}</strong>}</div>
-                        <div><span>Zona habitual</span>{editandoDenuncia ? <input value={formEditDenuncia.datosEquino.zonaHabitual} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, zonaHabitual: e.target.value}})} /> : <strong>{denunciaSeleccionada.datosEquino?.zonaHabitual || "—"}</strong>}</div>
-                        <div><span>Condición animal</span>{editandoDenuncia ? <textarea rows={2} value={formEditDenuncia.datosEquino.condicionAnimal} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, condicionAnimal: e.target.value}})} /> : <strong>{denunciaSeleccionada.datosEquino?.condicionAnimal || "—"}</strong>}</div>
-                      </div>
-                    </div>
-                  )}
-                  {editandoDenuncia && (
-                    <div className="md-modal-footer">
-                      <button className="md-btn-guardar" onClick={guardarEdicionDenuncia}>💾 Guardar cambios</button>
-                      <button className="md-btn-cancelar-edicion" onClick={() => setDenunciaSeleccionada(null)}>Cancelar</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
 
-      {/* ========== MIS SOLICITUDES DE ADOPCIÓN ========== */}
+      {/* ========== TABLA SOLICITUDES - FECHA ELIMINADA DE LA COLUMNA ESTADO ========== */}
       {tabActiva === "adopciones" && (
         <>
           <div className="md-stats">
@@ -502,22 +428,11 @@ function MisDenuncias() {
 
           <div className="md-card">
             <div className="md-card-top">
-              <h2>Mis solicitudes de adopción</h2>
-              <input
-                className="md-busqueda"
-                type="text"
-                placeholder="Buscar por animal, nombre o ciudad..."
-                value={busquedaSolicitudes}
-                onChange={(e) => setBusquedaSolicitudes(e.target.value)}
-              />
+              <h2>Mis solicitudes</h2>
+              <input className="md-busqueda" type="text" placeholder="Buscar por animal, nombre o ciudad..." value={busquedaSolicitudes} onChange={(e) => setBusquedaSolicitudes(e.target.value)} />
             </div>
-
             {solicitudesFiltradas.length === 0 ? (
-              <div className="md-vacio">
-                <span className="md-vacio-icono">🐾</span>
-                <p>{busquedaSolicitudes ? "Sin resultados." : "Aún no has enviado solicitudes de adopción."}</p>
-                {!busquedaSolicitudes && <Link to="/adopciones" className="md-btn-nueva">Solicitar adopción</Link>}
-              </div>
+              <div className="md-vacio"><span className="md-vacio-icono">🐾</span><p>{busquedaSolicitudes ? "Sin resultados." : "Aún no has enviado solicitudes."}</p></div>
             ) : (
               <div className="md-tabla-wrap">
                 <table className="md-tabla">
@@ -540,15 +455,25 @@ function MisDenuncias() {
                         <td>{s.telefono || "—"}</td>
                         <td>{s.ciudad || "—"}</td>
                         <td>
-                          <span className={`md-badge ${claseEstadoSolicitud(s.estado)}`}>{s.estado}</span>
-                          {s.fechaEncuentro && <div><small>📅 {new Date(s.fechaEncuentro).toLocaleDateString()}</small></div>}
+                          {/* Solo el badge, sin fecha del encuentro */}
+                          <span className={`md-badge ${claseEstadoSolicitud(s.estado)}`}>
+                            {s.estado}
+                          </span>
                         </td>
                         <td>{s.creadoEn?.toDate?.().toLocaleDateString() || "—"}</td>
                         <td>
                           <div className="md-acciones">
                             <button className="md-btn-detalle" onClick={() => verDetalleSolicitud(s)}>Detalle</button>
                             <button className="md-btn-editar" onClick={() => editarSolicitud(s)}>Editar</button>
-                            {s.estado === "Pendiente" && <button className="md-btn-cancelar" onClick={() => cancelarSolicitud(s)}>Cancelar</button>}
+                            {s.estado === "Pendiente" && (
+                              <button className="md-btn-cancelar" onClick={() => setConfirmModal({ 
+                                visible: true, 
+                                onConfirm: ejecutarCancelarSolicitud, 
+                                message: "¿Cancelar esta solicitud de adopción?", 
+                                itemId: s.id, 
+                                tipo: "solicitud" 
+                              })}>Cancelar</button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -558,72 +483,139 @@ function MisDenuncias() {
               </div>
             )}
           </div>
+        </>
+      )}
 
-          {/* Modal de Solicitud */}
-          {solicitudSeleccionada && (
-            <div className="md-modal-fondo" onClick={() => setSolicitudSeleccionada(null)}>
-              <div className="md-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="md-modal-header">
-                  <div>
-                    <span className="md-eyebrow">{editandoSolicitud ? "Editar solicitud" : "Detalle de solicitud"}</span>
-                    <h2>Solicitud para {solicitudSeleccionada.nombreAnimal || "adoptar"}</h2>
-                  </div>
-                  <button className="md-btn-cerrar" onClick={() => setSolicitudSeleccionada(null)}>×</button>
+      {/* MODAL PROFESIONAL PARA DENUNCIAS */}
+      {denunciaSeleccionada && (
+        <div className="modal-overlay" onClick={() => setDenunciaSeleccionada(null)}>
+          <div className="modal-content modal-profesional" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">⚖️</span>
+              <h2>{editandoDenuncia ? "Editar denuncia" : "Detalle de la denuncia"}</h2>
+              <button className="modal-cerrar" onClick={() => setDenunciaSeleccionada(null)}>✖</button>
+            </div>
+            <div className="modal-body">
+              {/* contenido del modal (se mantiene igual) */}
+              <div className="detalle-seccion">
+                <h3><span>🐾</span> Animal</h3>
+                <div className="detalle-grid">
+                  <div><strong>Tipo:</strong> {editandoDenuncia ? <input value={formEditDenuncia.tipoAnimal} onChange={e => setFormEditDenuncia({...formEditDenuncia, tipoAnimal: e.target.value})} /> : denunciaSeleccionada.tipoAnimal}</div>
+                  <div><strong>Raza/color:</strong> {editandoDenuncia ? <input value={formEditDenuncia.raza} onChange={e => setFormEditDenuncia({...formEditDenuncia, raza: e.target.value})} /> : denunciaSeleccionada.raza || "—"}</div>
                 </div>
-                <div className="md-modal-body">
-                  {!editandoSolicitud ? (
-                    <>
-                      <div className="md-modal-grid">
-                        <div><span>Animal</span><strong>{solicitudSeleccionada.nombreAnimal || "—"}</strong></div>
-                        <div><span>Solicitante</span><strong>{solicitudSeleccionada.nombre || "—"}</strong></div>
-                        <div><span>Email</span><strong>{solicitudSeleccionada.solicitanteEmail || "—"}</strong></div>
-                        <div><span>Teléfono</span><strong>{solicitudSeleccionada.telefono || "—"}</strong></div>
-                        <div><span>Ciudad</span><strong>{solicitudSeleccionada.ciudad || "—"}</strong></div>
-                        <div><span>Dirección</span><strong>{solicitudSeleccionada.direccion || "—"}</strong></div>
-                        <div><span>Tipo vivienda</span><strong>{solicitudSeleccionada.tipoVivienda || "—"}</strong></div>
-                        <div><span>Patio</span><strong>{solicitudSeleccionada.tienePatio ? "Sí" : "No"}</strong></div>
-                        <div><span>Vive con familia</span><strong>{solicitudSeleccionada.viveConFamilia ? "Sí" : "No"}</strong></div>
-                        <div><span>Otras mascotas</span><strong>{solicitudSeleccionada.tieneMascotas ? "Sí" : "No"}</strong></div>
-                        <div><span>Estado</span><span className={`md-badge ${claseEstadoSolicitud(solicitudSeleccionada.estado)}`}>{solicitudSeleccionada.estado}</span></div>
-                        {solicitudSeleccionada.fechaEncuentro && <div><span>Encuentro</span><strong>{new Date(solicitudSeleccionada.fechaEncuentro).toLocaleString()}</strong></div>}
-                      </div>
-                      <div className="md-descripcion"><span>Experiencia</span><p>{solicitudSeleccionada.experiencia || "—"}</p></div>
-                      <div className="md-descripcion"><span>Motivo</span><p>{solicitudSeleccionada.motivo || "—"}</p></div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="md-modal-grid">
-                        <div><span>Nombre</span><input value={formEditSolicitud.nombre} onChange={e => setFormEditSolicitud({...formEditSolicitud, nombre: e.target.value})} /></div>
-                        <div><span>Teléfono</span><input value={formEditSolicitud.telefono} onChange={e => setFormEditSolicitud({...formEditSolicitud, telefono: e.target.value})} /></div>
-                        <div><span>Ciudad</span><input value={formEditSolicitud.ciudad} onChange={e => setFormEditSolicitud({...formEditSolicitud, ciudad: e.target.value})} /></div>
-                        <div><span>Dirección</span><input value={formEditSolicitud.direccion} onChange={e => setFormEditSolicitud({...formEditSolicitud, direccion: e.target.value})} /></div>
-                        <div><span>Tipo vivienda</span>
-                          <select value={formEditSolicitud.tipoVivienda} onChange={e => setFormEditSolicitud({...formEditSolicitud, tipoVivienda: e.target.value})}>
-                            <option value="">Seleccionar</option>
-                            <option value="Casa">Casa</option>
-                            <option value="Apartamento">Apartamento</option>
-                            <option value="Finca">Finca</option>
-                          </select>
-                        </div>
-                        <div><label><input type="checkbox" checked={formEditSolicitud.tienePatio} onChange={e => setFormEditSolicitud({...formEditSolicitud, tienePatio: e.target.checked})} /> Tiene patio</label></div>
-                        <div><label><input type="checkbox" checked={formEditSolicitud.viveConFamilia} onChange={e => setFormEditSolicitud({...formEditSolicitud, viveConFamilia: e.target.checked})} /> Vive con familia</label></div>
-                        <div><label><input type="checkbox" checked={formEditSolicitud.tieneMascotas} onChange={e => setFormEditSolicitud({...formEditSolicitud, tieneMascotas: e.target.checked})} /> Tiene otras mascotas</label></div>
-                      </div>
-                      <div className="md-descripcion"><span>Experiencia</span><textarea rows={2} value={formEditSolicitud.experiencia} onChange={e => setFormEditSolicitud({...formEditSolicitud, experiencia: e.target.value})} /></div>
-                      <div className="md-descripcion"><span>Motivo</span><textarea rows={2} value={formEditSolicitud.motivo} onChange={e => setFormEditSolicitud({...formEditSolicitud, motivo: e.target.value})} /></div>
-                    </>
-                  )}
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>⚠️</span> Maltrato</h3>
+                <div className="detalle-grid">
+                  <div><strong>Tipo:</strong> {editandoDenuncia ? <input value={formEditDenuncia.tipoMaltrato} onChange={e => setFormEditDenuncia({...formEditDenuncia, tipoMaltrato: e.target.value})} /> : denunciaSeleccionada.tipoMaltrato}</div>
+                  <div style={{ gridColumn: "span 2" }}><strong>Descripción:</strong> {editandoDenuncia ? <textarea rows={3} value={formEditDenuncia.descripcion} onChange={e => setFormEditDenuncia({...formEditDenuncia, descripcion: e.target.value})} /> : denunciaSeleccionada.descripcion || "Sin descripción"}</div>
+                  <div><strong>Fecha:</strong> {editandoDenuncia ? <input type="date" value={formEditDenuncia.fechaCaso} onChange={e => setFormEditDenuncia({...formEditDenuncia, fechaCaso: e.target.value})} /> : denunciaSeleccionada.fechaCaso}</div>
+                  <div><strong>Dirección:</strong> {editandoDenuncia ? <input value={formEditDenuncia.direccion} onChange={e => setFormEditDenuncia({...formEditDenuncia, direccion: e.target.value})} /> : denunciaSeleccionada.direccion}</div>
                 </div>
-                {editandoSolicitud && (
-                  <div className="md-modal-footer">
-                    <button className="md-btn-guardar" onClick={guardarEdicionSolicitud}>Guardar cambios</button>
-                    <button className="md-btn-cancelar-edicion" onClick={() => setSolicitudSeleccionada(null)}>Cancelar</button>
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>👤</span> Presunto infractor</h3>
+                <div className="detalle-grid">
+                  {["nombre","documento","ciudad","telefono","correo"].map(campo => (
+                    <div key={campo}>
+                      <strong>{campo.charAt(0).toUpperCase()+campo.slice(1)}:</strong>
+                      {editandoDenuncia ? <input value={formEditDenuncia.presuntoInfractor[campo]} onChange={e => setFormEditDenuncia({...formEditDenuncia, presuntoInfractor: {...formEditDenuncia.presuntoInfractor, [campo]: e.target.value}})} /> : denunciaSeleccionada.presuntoInfractor?.[campo] || "No registrado"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>👮</span> Denunciante</h3>
+                <div className="detalle-grid">
+                  <div><strong>Nombre:</strong> {editandoDenuncia ? <input value={formEditDenuncia.denuncianteNombre} onChange={e => setFormEditDenuncia({...formEditDenuncia, denuncianteNombre: e.target.value})} /> : denunciaSeleccionada.denuncianteNombre || "Anónimo"}</div>
+                  <div><strong>Email:</strong> {editandoDenuncia ? <input value={formEditDenuncia.denuncianteEmail} onChange={e => setFormEditDenuncia({...formEditDenuncia, denuncianteEmail: e.target.value})} /> : denunciaSeleccionada.denuncianteEmail || "—"}</div>
+                  <div><strong>Teléfono:</strong> {editandoDenuncia ? <input value={formEditDenuncia.denuncianteTelefono} onChange={e => setFormEditDenuncia({...formEditDenuncia, denuncianteTelefono: e.target.value})} /> : denunciaSeleccionada.denuncianteTelefono || "—"}</div>
+                </div>
+              </div>
+              {denunciaSeleccionada.evidencias?.length > 0 && (
+                <div className="detalle-seccion">
+                  <h3><span>📎</span> Evidencias</h3>
+                  <div className="evidencias-lista">{denunciaSeleccionada.evidencias.map((url,i)=> <a key={i} href={url} target="_blank">Ver evidencia {i+1}</a>)}</div>
+                </div>
+              )}
+              {denunciaSeleccionada.esEquino && (
+                <div className="detalle-seccion">
+                  <h3><span>🐴</span> Datos equino / zorrero</h3>
+                  <div className="detalle-grid">
+                    <div><strong>Vehículo:</strong> {editandoDenuncia ? <input value={formEditDenuncia.datosEquino.descripcionVehiculo} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, descripcionVehiculo: e.target.value}})} /> : denunciaSeleccionada.datosEquino?.descripcionVehiculo || "—"}</div>
+                    <div><strong>Zona habitual:</strong> {editandoDenuncia ? <input value={formEditDenuncia.datosEquino.zonaHabitual} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, zonaHabitual: e.target.value}})} /> : denunciaSeleccionada.datosEquino?.zonaHabitual || "—"}</div>
+                    <div><strong>Condición:</strong> {editandoDenuncia ? <textarea rows={2} value={formEditDenuncia.datosEquino.condicionAnimal} onChange={e => setFormEditDenuncia({...formEditDenuncia, datosEquino: {...formEditDenuncia.datosEquino, condicionAnimal: e.target.value}})} /> : denunciaSeleccionada.datosEquino?.condicionAnimal || "—"}</div>
                   </div>
-                )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              {editandoDenuncia ? (
+                <>
+                  <button className="btn-guardar-modal" onClick={guardarEdicionDenuncia}>Guardar cambios</button>
+                  <button className="btn-cancelar-modal" onClick={() => setDenunciaSeleccionada(null)}>Cancelar</button>
+                </>
+              ) : (
+                <button className="btn-editar-modal" onClick={() => setEditandoDenuncia(true)}>Editar denuncia</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PROFESIONAL PARA SOLICITUDES */}
+      {solicitudSeleccionada && (
+        <div className="modal-overlay" onClick={() => setSolicitudSeleccionada(null)}>
+          <div className="modal-content modal-profesional" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">📋</span>
+              <h2>{editandoSolicitud ? "Editar solicitud" : "Detalle de la solicitud"}</h2>
+              <button className="modal-cerrar" onClick={() => setSolicitudSeleccionada(null)}>✖</button>
+            </div>
+            <div className="modal-body">
+              {/* contenido del modal de solicitud (se mantiene igual) */}
+              <div className="detalle-seccion">
+                <h3><span>🐶</span> Animal solicitado</h3>
+                <div className="detalle-grid"><div><strong>Nombre:</strong> {solicitudSeleccionada.nombreAnimal || "—"}</div></div>
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>👤</span> Datos del solicitante</h3>
+                <div className="detalle-grid">
+                  <div><strong>Nombre:</strong> {editandoSolicitud ? <input value={formEditSolicitud.nombre} onChange={e => setFormEditSolicitud({...formEditSolicitud, nombre: e.target.value})} /> : solicitudSeleccionada.nombre || "—"}</div>
+                  <div><strong>Teléfono:</strong> {editandoSolicitud ? <input value={formEditSolicitud.telefono} onChange={e => setFormEditSolicitud({...formEditSolicitud, telefono: e.target.value})} /> : solicitudSeleccionada.telefono || "—"}</div>
+                  <div><strong>Ciudad:</strong> {editandoSolicitud ? <input value={formEditSolicitud.ciudad} onChange={e => setFormEditSolicitud({...formEditSolicitud, ciudad: e.target.value})} /> : solicitudSeleccionada.ciudad || "—"}</div>
+                  <div><strong>Dirección:</strong> {editandoSolicitud ? <input value={formEditSolicitud.direccion} onChange={e => setFormEditSolicitud({...formEditSolicitud, direccion: e.target.value})} /> : solicitudSeleccionada.direccion || "—"}</div>
+                </div>
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>🏠</span> Información del hogar</h3>
+                <div className="detalle-grid">
+                  <div><strong>Tipo vivienda:</strong> {editandoSolicitud ? <select value={formEditSolicitud.tipoVivienda} onChange={e => setFormEditSolicitud({...formEditSolicitud, tipoVivienda: e.target.value})}><option value="">Seleccionar</option><option>Casa</option><option>Apartamento</option><option>Finca</option></select> : solicitudSeleccionada.tipoVivienda || "—"}</div>
+                  <div><strong>Patio:</strong> {editandoSolicitud ? <input type="checkbox" checked={formEditSolicitud.tienePatio} onChange={e => setFormEditSolicitud({...formEditSolicitud, tienePatio: e.target.checked})} /> : (solicitudSeleccionada.tienePatio ? "Sí" : "No")}</div>
+                  <div><strong>Vive con familia:</strong> {editandoSolicitud ? <input type="checkbox" checked={formEditSolicitud.viveConFamilia} onChange={e => setFormEditSolicitud({...formEditSolicitud, viveConFamilia: e.target.checked})} /> : (solicitudSeleccionada.viveConFamilia ? "Sí" : "No")}</div>
+                </div>
+              </div>
+              <div className="detalle-seccion">
+                <h3><span>🐾</span> Experiencia y motivo</h3>
+                <div className="detalle-grid">
+                  <div><strong>Otras mascotas:</strong> {editandoSolicitud ? <input type="checkbox" checked={formEditSolicitud.tieneMascotas} onChange={e => setFormEditSolicitud({...formEditSolicitud, tieneMascotas: e.target.checked})} /> : (solicitudSeleccionada.tieneMascotas ? "Sí" : "No")}</div>
+                  <div style={{ gridColumn: "span 2" }}><strong>Experiencia:</strong> {editandoSolicitud ? <textarea rows={2} value={formEditSolicitud.experiencia} onChange={e => setFormEditSolicitud({...formEditSolicitud, experiencia: e.target.value})} /> : solicitudSeleccionada.experiencia || "—"}</div>
+                  <div style={{ gridColumn: "span 2" }}><strong>Motivo:</strong> {editandoSolicitud ? <textarea rows={2} value={formEditSolicitud.motivo} onChange={e => setFormEditSolicitud({...formEditSolicitud, motivo: e.target.value})} /> : solicitudSeleccionada.motivo || "—"}</div>
+                </div>
               </div>
             </div>
-          )}
-        </>
+            <div className="modal-footer">
+              {editandoSolicitud ? (
+                <>
+                  <button className="btn-guardar-modal" onClick={guardarEdicionSolicitud}>Guardar cambios</button>
+                  <button className="btn-cancelar-modal" onClick={() => setSolicitudSeleccionada(null)}>Cancelar</button>
+                </>
+              ) : (
+                <button className="btn-editar-modal" onClick={() => setEditandoSolicitud(true)}>Editar solicitud</button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
