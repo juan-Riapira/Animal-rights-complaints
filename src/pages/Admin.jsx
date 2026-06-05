@@ -138,34 +138,28 @@ function Admin() {
     }
   };
 
-const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
-  try {
-    // 1. Actualizar estado de la solicitud
-    await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Aprobada" });
-
-    // 2. Si existe animalId, cambiar el estado de la publicación a "Adoptado"
-    if (animalId) {
-      await updateDoc(doc(db, "adopciones", animalId), {
-        estadoAdopcion: "Adoptado",
-        adoptanteId: solicitanteId,  // opcional: guardar quién adoptó
-        fechaAdopcion: new Date(),
-      }); 
+  const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
+    try {
+      await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Aprobada" });
+      if (animalId) {
+        await updateDoc(doc(db, "adopciones", animalId), {
+          estadoAdopcion: "Adoptado",
+          adoptanteId: solicitanteId,
+          fechaAdopcion: new Date(),
+        });
+      }
+      await crearNotificacion(
+        solicitanteId,
+        "✅ Solicitud aprobada",
+        `Tu solicitud para adoptar a ${animalNombre || "una mascota"} ha sido aprobada. La publicación ahora aparece como "Adoptado".`,
+        "aprobacion"
+      );
+      obtenerDatos();
+      addToast("Solicitud aprobada y publicación actualizada", "success");
+    } catch (error) {
+      addToast("Error al aprobar la solicitud", "error");
     }
-
-    // 3. Notificar al solicitante
-    await crearNotificacion(
-      solicitanteId,
-      "✅ Solicitud aprobada",
-      `Tu solicitud para adoptar a ${animalNombre || "una mascota"} ha sido aprobada. La publicación ahora aparece como "Adoptado".`,
-      "aprobacion"
-    );
-
-    obtenerDatos();
-    addToast("Solicitud aprobada y publicación actualizada", "success");
-  } catch (error) {
-    addToast("Error al aprobar la solicitud", "error");
-  }
-};
+  };
 
   const rechazarSolicitud = async (id, solicitanteId, animalNombre) => {
     try {
@@ -275,6 +269,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
           if (editForm.tieneMascotas !== undefined) updateData.tieneMascotas = editForm.tieneMascotas;
           if (editForm.experiencia !== undefined) updateData.experiencia = editForm.experiencia;
           if (editForm.motivo !== undefined) updateData.motivo = editForm.motivo;
+          if (editForm.fotoCedula !== undefined) updateData.fotoCedula = editForm.fotoCedula;
           break;
         default:
           break;
@@ -373,7 +368,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
         ))}
       </div>
 
-      {/* MODAL DE EDICIÓN (contenido completo) */}
+      {/* MODAL DE EDICIÓN (completo) */}
       {modalEdicion.visible && (
         <div className="modal-overlay" onClick={() => setModalEdicion({ visible: false, tipo: null, data: null })}>
           <div className="modal-content modal-profesional" onClick={(e) => e.stopPropagation()}>
@@ -506,7 +501,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
                 </div>
               )}
 
-              {/* SOLICITUD */}
+              {/* SOLICITUD (incluye fotoCedula) */}
               {modalEdicion.tipo === "solicitud" && (
                 <div className="detalle-grid">
                   <div><strong>Animal:</strong> {modalEdicion.data.nombreAnimal || "No especificado"}</div>
@@ -520,6 +515,11 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
                   <div><strong>Otras mascotas:</strong> <input type="checkbox" checked={editForm.tieneMascotas || false} onChange={(e) => setEditForm({ ...editForm, tieneMascotas: e.target.checked })} /></div>
                   <div><strong>Experiencia:</strong> <textarea rows={2} value={editForm.experiencia || ""} onChange={(e) => setEditForm({ ...editForm, experiencia: e.target.value })} /></div>
                   <div><strong>Motivo:</strong> <textarea rows={2} value={editForm.motivo || ""} onChange={(e) => setEditForm({ ...editForm, motivo: e.target.value })} /></div>
+                  <div><strong>Foto cédula:</strong> 
+                    {editForm.fotoCedula ? (
+                      <a href={editForm.fotoCedula} target="_blank" rel="noreferrer">Ver imagen</a>
+                    ) : "No disponible"}
+                  </div>
                 </div>
               )}
             </div>
@@ -595,7 +595,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
       {/* TABLA DENUNCIAS */}
       {tabActiva === "denuncias" && (
         <div className="admin-table-card">
-          <h2> Denuncias Registradas</h2>
+          <h2>📋 Denuncias Registradas</h2>
           <table className="admin-table">
             <thead>
               <tr>
@@ -702,7 +702,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
         </div>
       )}
 
-      {/* TABLA SOLICITUDES */}
+      {/* TABLA SOLICITUDES con columna Foto cédula */}
       {tabActiva === "solicitudes" && (
         <div className="admin-table-card">
           <h2>📋 Solicitudes de Adopción</h2>
@@ -715,6 +715,7 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
                 <th>Ciudad</th>
                 <th>Estado</th>
                 <th>Fecha encuentro</th>
+                <th>Foto cédula</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -733,9 +734,14 @@ const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
                   <td>
                     {s.fechaEncuentro ? new Date(s.fechaEncuentro).toLocaleString() : "—"}
                   </td>
+                  <td>
+                    {s.fotoCedula ? (
+                      <a href={s.fotoCedula} target="_blank" rel="noreferrer" className="foto-link">Ver cédula</a>
+                    ) : "No disponible"}
+                  </td>
                   <td className="acciones-botones">
                     <button className="btn-editar" onClick={() => abrirEdicion("solicitud", s)}>Editar</button>
-                   <button className="btn-aprobar" onClick={() => aprobarSolicitud(s.id, s.solicitanteId, s.nombreAnimal, s.animalId)}>Aprobar</button>
+                    <button className="btn-aprobar" onClick={() => aprobarSolicitud(s.id, s.solicitanteId, s.nombreAnimal, s.animalId)}>Aprobar</button>
                     <button className="btn-rechazar" onClick={() => rechazarSolicitud(s.id, s.solicitanteId, s.nombreAnimal)}>Rechazar</button>
                     <button className="btn-agendar" onClick={() => abrirModalFecha(s)}>Agendar</button>
                   </td>

@@ -24,12 +24,12 @@ const PASOS = [
   "Información",
   "Hogar",
   "Experiencia",
+  "Verificación",
   "Confirmación",
 ];
 
 // Normalizar texto (minúsculas, sin acentos, sin espacios extras)
 const normalizarTexto = (texto) => {
-  if (!texto) return "";
   return texto
     .toLowerCase()
     .normalize("NFD")
@@ -58,6 +58,9 @@ function SolicitarAdopcion() {
   const [tieneMascotas, setTieneMascotas] = useState(false);
   const [experiencia, setExperiencia] = useState("");
   const [motivo, setMotivo] = useState("");
+
+  // Nuevo campo: foto de la cédula
+  const [fotoCedula, setFotoCedula] = useState("");
 
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -90,7 +93,19 @@ function SolicitarAdopcion() {
   // Validar que el teléfono solo tenga dígitos
   const esTelefonoValido = (tel) => /^\d+$/.test(tel);
 
-  // Verificar si el nombre coincide con algún infractor (tabla registroInfractores)
+  // Validar que la URL de la cédula sea válida (opcional: solo comprobar que no esté vacía)
+  const validarFotoCedula = (url) => {
+    if (!url.trim()) return "Debes proporcionar una foto de tu cédula (enlace)";
+    // Opcional: comprobar formato de URL básico
+    try {
+      new URL(url);
+      return null;
+    } catch {
+      return "El enlace no es válido. Debe comenzar con http:// o https://";
+    }
+  };
+
+  // Verificar si el nombre coincide con algún infractor
   const verificarNombreInfractor = async (nombreCompleto) => {
     const querySnapshot = await getDocs(collection(db, "registroInfractores"));
     const nombreNormalizado = normalizarTexto(nombreCompleto);
@@ -99,53 +114,20 @@ function SolicitarAdopcion() {
     for (const docInf of querySnapshot.docs) {
       const nombreInfractor = docInf.data().nombre;
       if (!nombreInfractor) continue;
+      
       const nombreInfNormalizado = normalizarTexto(nombreInfractor);
       const palabrasInfractor = nombreInfNormalizado.split(/\s+/);
       
       if (nombreNormalizado === nombreInfNormalizado) return true;
       const palabrasComunes = palabrasSolicitante.filter(p => palabrasInfractor.includes(p));
-      if (palabrasComunes.length >= 2) return true; // Ajustado a 2 para mayor sensibilidad
+      if (palabrasComunes.length >= 3) return true;
       if (nombreNormalizado.includes(nombreInfNormalizado)) return true;
       if (nombreInfNormalizado.includes(nombreNormalizado)) return true;
     }
     return false;
   };
 
-  // NUEVA FUNCIÓN: Verificar si el nombre aparece en alguna denuncia como presunto infractor o denunciante
-  const verificarNombreEnDenuncias = async (nombreCompleto) => {
-    const querySnapshot = await getDocs(collection(db, "denuncias"));
-    const nombreNormalizado = normalizarTexto(nombreCompleto);
-    const palabrasSolicitante = nombreNormalizado.split(/\s+/);
-
-    for (const docDen of querySnapshot.docs) {
-      const data = docDen.data();
-      // Revisar presuntoInfractor.nombre
-      const nombreInfractor = data.presuntoInfractor?.nombre;
-      if (nombreInfractor) {
-        const nombreInfNormalizado = normalizarTexto(nombreInfractor);
-        const palabrasInfractor = nombreInfNormalizado.split(/\s+/);
-        if (nombreNormalizado === nombreInfNormalizado) return true;
-        const palabrasComunes = palabrasSolicitante.filter(p => palabrasInfractor.includes(p));
-        if (palabrasComunes.length >= 2) return true;
-        if (nombreNormalizado.includes(nombreInfNormalizado)) return true;
-        if (nombreInfNormalizado.includes(nombreNormalizado)) return true;
-      }
-      // Opcional: también verificar denuncianteNombre (si se quiere bloquear por ser quien denunció)
-      const denunciante = data.denuncianteNombre;
-      if (denunciante) {
-        const denunNormalizado = normalizarTexto(denunciante);
-        const palabrasDenun = denunNormalizado.split(/\s+/);
-        if (nombreNormalizado === denunNormalizado) return true;
-        const palabrasComunes = palabrasSolicitante.filter(p => palabrasDenun.includes(p));
-        if (palabrasComunes.length >= 2) return true;
-        if (nombreNormalizado.includes(denunNormalizado)) return true;
-        if (denunNormalizado.includes(nombreNormalizado)) return true;
-      }
-    }
-    return false;
-  };
-
-  // Verificar si el usuario es agresor (documento, correo, nombre en infractores o en denuncias)
+  // Verificar si el usuario es agresor (documento, correo o nombre)
   const verificarAgresor = async (usuario) => {
     if (!usuario) return false;
     
@@ -164,11 +146,8 @@ function SolicitarAdopcion() {
     const snapEmail = await getDocs(qEmail);
     if (!snapEmail.empty) return true;
     
-    // 3. Por nombre en registroInfractores
+    // 3. Por nombre
     if (await verificarNombreInfractor(nombre)) return true;
-    
-    // 4. Por nombre en denuncias (nuevo)
-    if (await verificarNombreEnDenuncias(nombre)) return true;
     
     return false;
   };
@@ -196,6 +175,11 @@ function SolicitarAdopcion() {
     if (paso === 2) {
       if (!experiencia.trim()) nuevosErrores.experiencia = "Cuéntanos tu experiencia cuidando animales";
       if (!motivo.trim()) nuevosErrores.motivo = "¿Por qué deseas adoptar?";
+    }
+
+    if (paso === 3) {
+      const errorFoto = validarFotoCedula(fotoCedula);
+      if (errorFoto) nuevosErrores.fotoCedula = errorFoto;
     }
 
     setErrores(nuevosErrores);
@@ -229,12 +213,15 @@ function SolicitarAdopcion() {
     if (!tipoVivienda) nuevosErrores.tipoVivienda = "Selecciona el tipo de vivienda";
     if (!experiencia.trim()) nuevosErrores.experiencia = "Cuéntanos tu experiencia cuidando animales";
     if (!motivo.trim()) nuevosErrores.motivo = "¿Por qué deseas adoptar?";
+    const errorFoto = validarFotoCedula(fotoCedula);
+    if (errorFoto) nuevosErrores.fotoCedula = errorFoto;
 
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       if (!nombre.trim() || !telefono.trim() || !ciudad.trim() || !direccion.trim() || (telefono.trim() && !esTelefonoValido(telefono.trim()))) setPaso(0);
       else if (!tipoVivienda) setPaso(1);
       else if (!experiencia.trim() || !motivo.trim()) setPaso(2);
+      else if (errorFoto) setPaso(3);
       return;
     }
 
@@ -249,7 +236,7 @@ function SolicitarAdopcion() {
 
       const esAgresor = await verificarAgresor(user);
       if (esAgresor) {
-        addToast(" No se ha podido completar el procedimiento. Tu nombre está asociado a una denuncia o registro de maltrato animal.", "error");
+        addToast("❌ No puedes realizar esta adopción porque tu nombre coincide con el de una persona registrada como infractora de maltrato animal.", "error");
         setEnviando(false);
         return;
       }
@@ -269,6 +256,7 @@ function SolicitarAdopcion() {
         tieneMascotas,
         experiencia,
         motivo,
+        fotoCedula, // nuevo campo
         estado: "Pendiente",
         creadoEn: new Date(),
       });
@@ -476,8 +464,33 @@ function SolicitarAdopcion() {
           </div>
         )}
 
-        {/* Paso 3 - Confirmación */}
+        {/* Paso 3 - Verificación (foto de cédula) */}
         {paso === 3 && (
+          <div className="den-seccion">
+            <div className="den-sec-titulo">
+              <span className="den-sec-icono">🪪</span>
+              <h2>Verificación de identidad</h2>
+            </div>
+
+            <div className="den-campo">
+              <label>Foto de la cédula (enlace) <span className="den-req">*</span></label>
+              <input
+                type="url"
+                value={fotoCedula}
+                onChange={(e) => setFotoCedula(e.target.value)}
+                className={errores.fotoCedula ? "campo-error" : ""}
+                placeholder="https://ejemplo.com/mi-cedula.jpg"
+              />
+              {errores.fotoCedula && <span className="den-error-msg">{errores.fotoCedula}</span>}
+              <small style={{ fontSize: "10px", color: "#8fa07a" }}>
+                Sube una foto clara de tu cédula a un servicio como Imgur, Google Drive (enlace público) o cualquier hosting de imágenes.
+              </small>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 4 - Confirmación */}
+        {paso === 4 && (
           <div className="den-seccion">
             <div className="den-sec-titulo">
               <span className="den-sec-icono">✅</span>
@@ -491,6 +504,7 @@ function SolicitarAdopcion() {
                 <div><span>Ciudad</span><strong>{ciudad}</strong></div>
                 <div><span>Animal</span><strong>{animal?.nombreAnimal}</strong></div>
                 <div><span>Tipo vivienda</span><strong>{tipoVivienda}</strong></div>
+                <div><span>Foto cédula</span><strong><a href={fotoCedula} target="_blank" rel="noopener noreferrer">Ver imagen</a></strong></div>
               </div>
             </div>
           </div>
