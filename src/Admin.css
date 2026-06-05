@@ -447,3 +447,52 @@
   object-fit: cover;
 }
 
+/* Badges de estado */
+.estado-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 40px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: #f1f5f9;
+  color: #1e293b;
+}
+.estado-recibida {
+  background: #e8f1fb;
+  color: #185fa5;
+}
+.estado-revision {
+  background: #ede8f8;
+  color: #6d3da0;
+}
+.estado-aprobada {
+  background: #dcfce7;
+  color: #166534;
+}
+.estado-escalada {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.estado-pendiente {
+  background: #fed7aa;
+  color: #9a3412;
+}
+.estado-encuentro {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.estado-cancelada {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.foto-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.foto-link:hover {
+  text-decoration: underline;
+}

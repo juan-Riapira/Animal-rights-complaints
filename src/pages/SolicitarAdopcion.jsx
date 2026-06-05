@@ -1,15 +1,18 @@
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   getFirestore,
   collection,
   addDoc,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
-import {
-  getAuth,
-} from "firebase/auth";
+import { getAuth } from "firebase/auth";
 
 import app from "../firebase/config";
 import "../Denuncia.css";
@@ -24,8 +27,20 @@ const PASOS = [
   "Confirmación",
 ];
 
+// Normalizar texto (minúsculas, sin acentos, sin espacios extras)
+const normalizarTexto = (texto) => {
+  if (!texto) return "";
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
 function SolicitarAdopcion() {
   const location = useLocation();
+  const navigate = useNavigate();
   const animal = location.state?.animal;
 
   const [paso, setPaso] = useState(0);
@@ -47,15 +62,127 @@ function SolicitarAdopcion() {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
-  // Función para validar que el teléfono solo contenga dígitos
+  // Toasts
+  const [toasts, setToasts] = useState([]);
+  const addToast = (message, type = "info") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => removeToast(id), 4000);
+  };
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
+
+  // Validación de nombre completo (mínimo 4 palabras, cada una >= 2 letras)
+  const validarNombreCompleto = (nombreStr) => {
+    const partes = nombreStr.trim().split(/\s+/);
+    if (partes.length < 4) {
+      return "Debes ingresar nombre completo (mínimo 4 palabras: primer nombre, segundo nombre, primer apellido, segundo apellido)";
+    }
+    for (let parte of partes) {
+      if (parte.length < 2) {
+        return "Cada nombre/apellido debe tener al menos 2 caracteres";
+      }
+    }
+    return null;
+  };
+
+  // Validar que el teléfono solo tenga dígitos
   const esTelefonoValido = (tel) => /^\d+$/.test(tel);
 
-  // Validar el paso actual
-  const validarPaso = () => {
+  // Verificar si el nombre coincide con algún infractor (tabla registroInfractores)
+  const verificarNombreInfractor = async (nombreCompleto) => {
+    const querySnapshot = await getDocs(collection(db, "registroInfractores"));
+    const nombreNormalizado = normalizarTexto(nombreCompleto);
+    const palabrasSolicitante = nombreNormalizado.split(/\s+/);
+
+    for (const docInf of querySnapshot.docs) {
+      const nombreInfractor = docInf.data().nombre;
+      if (!nombreInfractor) continue;
+      const nombreInfNormalizado = normalizarTexto(nombreInfractor);
+      const palabrasInfractor = nombreInfNormalizado.split(/\s+/);
+      
+      if (nombreNormalizado === nombreInfNormalizado) return true;
+      const palabrasComunes = palabrasSolicitante.filter(p => palabrasInfractor.includes(p));
+      if (palabrasComunes.length >= 2) return true; // Ajustado a 2 para mayor sensibilidad
+      if (nombreNormalizado.includes(nombreInfNormalizado)) return true;
+      if (nombreInfNormalizado.includes(nombreNormalizado)) return true;
+    }
+    return false;
+  };
+
+  // NUEVA FUNCIÓN: Verificar si el nombre aparece en alguna denuncia como presunto infractor o denunciante
+  const verificarNombreEnDenuncias = async (nombreCompleto) => {
+    const querySnapshot = await getDocs(collection(db, "denuncias"));
+    const nombreNormalizado = normalizarTexto(nombreCompleto);
+    const palabrasSolicitante = nombreNormalizado.split(/\s+/);
+
+    for (const docDen of querySnapshot.docs) {
+      const data = docDen.data();
+      // Revisar presuntoInfractor.nombre
+      const nombreInfractor = data.presuntoInfractor?.nombre;
+      if (nombreInfractor) {
+        const nombreInfNormalizado = normalizarTexto(nombreInfractor);
+        const palabrasInfractor = nombreInfNormalizado.split(/\s+/);
+        if (nombreNormalizado === nombreInfNormalizado) return true;
+        const palabrasComunes = palabrasSolicitante.filter(p => palabrasInfractor.includes(p));
+        if (palabrasComunes.length >= 2) return true;
+        if (nombreNormalizado.includes(nombreInfNormalizado)) return true;
+        if (nombreInfNormalizado.includes(nombreNormalizado)) return true;
+      }
+      // Opcional: también verificar denuncianteNombre (si se quiere bloquear por ser quien denunció)
+      const denunciante = data.denuncianteNombre;
+      if (denunciante) {
+        const denunNormalizado = normalizarTexto(denunciante);
+        const palabrasDenun = denunNormalizado.split(/\s+/);
+        if (nombreNormalizado === denunNormalizado) return true;
+        const palabrasComunes = palabrasSolicitante.filter(p => palabrasDenun.includes(p));
+        if (palabrasComunes.length >= 2) return true;
+        if (nombreNormalizado.includes(denunNormalizado)) return true;
+        if (denunNormalizado.includes(nombreNormalizado)) return true;
+      }
+    }
+    return false;
+  };
+
+  // Verificar si el usuario es agresor (documento, correo, nombre en infractores o en denuncias)
+  const verificarAgresor = async (usuario) => {
+    if (!usuario) return false;
+    
+    // 1. Por documento
+    const userDocRef = doc(db, "users", usuario.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    let documento = userDocSnap.exists() ? userDocSnap.data().documento : null;
+    if (documento) {
+      const q = query(collection(db, "registroInfractores"), where("documento", "==", documento));
+      const snap = await getDocs(q);
+      if (!snap.empty) return true;
+    }
+    
+    // 2. Por correo
+    const qEmail = query(collection(db, "registroInfractores"), where("correo", "==", usuario.email));
+    const snapEmail = await getDocs(qEmail);
+    if (!snapEmail.empty) return true;
+    
+    // 3. Por nombre en registroInfractores
+    if (await verificarNombreInfractor(nombre)) return true;
+    
+    // 4. Por nombre en denuncias (nuevo)
+    if (await verificarNombreEnDenuncias(nombre)) return true;
+    
+    return false;
+  };
+
+  // Validar paso actual
+  const validarPaso = async () => {
     const nuevosErrores = {};
 
     if (paso === 0) {
       if (!nombre.trim()) nuevosErrores.nombre = "El nombre completo es obligatorio";
+      else {
+        const errorNombre = validarNombreCompleto(nombre);
+        if (errorNombre) nuevosErrores.nombre = errorNombre;
+      }
       if (!telefono.trim()) nuevosErrores.telefono = "El teléfono es obligatorio";
       else if (!esTelefonoValido(telefono.trim())) nuevosErrores.telefono = "El teléfono solo debe contener números";
       if (!ciudad.trim()) nuevosErrores.ciudad = "La ciudad es obligatoria";
@@ -75,8 +202,8 @@ function SolicitarAdopcion() {
     return Object.keys(nuevosErrores).length === 0;
   };
 
-  const siguiente = () => {
-    if (validarPaso()) {
+  const siguiente = async () => {
+    if (await validarPaso()) {
       setPaso((prev) => prev + 1);
       setErrores({});
     }
@@ -90,24 +217,21 @@ function SolicitarAdopcion() {
   const enviarSolicitud = async () => {
     // Validación completa antes de enviar
     const nuevosErrores = {};
-
-    // Paso 0
     if (!nombre.trim()) nuevosErrores.nombre = "El nombre completo es obligatorio";
+    else {
+      const errorNombre = validarNombreCompleto(nombre);
+      if (errorNombre) nuevosErrores.nombre = errorNombre;
+    }
     if (!telefono.trim()) nuevosErrores.telefono = "El teléfono es obligatorio";
     else if (!esTelefonoValido(telefono.trim())) nuevosErrores.telefono = "El teléfono solo debe contener números";
     if (!ciudad.trim()) nuevosErrores.ciudad = "La ciudad es obligatoria";
     if (!direccion.trim()) nuevosErrores.direccion = "La dirección es obligatoria";
-
-    // Paso 1
     if (!tipoVivienda) nuevosErrores.tipoVivienda = "Selecciona el tipo de vivienda";
-
-    // Paso 2
     if (!experiencia.trim()) nuevosErrores.experiencia = "Cuéntanos tu experiencia cuidando animales";
     if (!motivo.trim()) nuevosErrores.motivo = "¿Por qué deseas adoptar?";
 
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
-      // Redirigir al paso correspondiente
       if (!nombre.trim() || !telefono.trim() || !ciudad.trim() || !direccion.trim() || (telefono.trim() && !esTelefonoValido(telefono.trim()))) setPaso(0);
       else if (!tipoVivienda) setPaso(1);
       else if (!experiencia.trim() || !motivo.trim()) setPaso(2);
@@ -117,6 +241,19 @@ function SolicitarAdopcion() {
     setEnviando(true);
     try {
       const user = auth.currentUser;
+      if (!user) {
+        addToast("Debes iniciar sesión para enviar una solicitud", "error");
+        navigate("/login");
+        return;
+      }
+
+      const esAgresor = await verificarAgresor(user);
+      if (esAgresor) {
+        addToast(" No se ha podido completar el procedimiento. Tu nombre está asociado a una denuncia o registro de maltrato animal.", "error");
+        setEnviando(false);
+        return;
+      }
+
       await addDoc(collection(db, "solicitudesAdopcion"), {
         animalId: animal?.id || null,
         nombreAnimal: animal?.nombreAnimal || "",
@@ -136,8 +273,9 @@ function SolicitarAdopcion() {
         creadoEn: new Date(),
       });
       setEnviado(true);
+      addToast("Solicitud enviada correctamente", "success");
     } catch (error) {
-      alert("Error al enviar la solicitud: " + error.message);
+      addToast("Error al enviar la solicitud: " + error.message, "error");
     } finally {
       setEnviando(false);
     }
@@ -160,6 +298,15 @@ function SolicitarAdopcion() {
 
   return (
     <div className="den-page">
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            <span className="toast-message">{toast.message}</span>
+            <button className="toast-close" onClick={() => removeToast(toast.id)}>×</button>
+          </div>
+        ))}
+      </div>
+
       <div className="den-header">
         <span className="den-eyebrow">NatuFauna · Adopciones</span>
         <h1>Solicitud de adopción</h1>
@@ -182,6 +329,7 @@ function SolicitarAdopcion() {
       </div>
 
       <div className="den-card">
+        {/* Paso 0 - Información personal */}
         {paso === 0 && (
           <div className="den-seccion">
             <div className="den-sec-titulo">
@@ -197,8 +345,10 @@ function SolicitarAdopcion() {
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   className={errores.nombre ? "campo-error" : ""}
+                  placeholder="Ej: Juan Carlos Pérez López"
                 />
                 {errores.nombre && <span className="den-error-msg">{errores.nombre}</span>}
+                <small style={{ fontSize: "10px", color: "#8fa07a" }}>Mínimo 4 palabras (primer nombre, segundo nombre, primer apellido, segundo apellido)</small>
               </div>
 
               <div className="den-campo">
@@ -208,6 +358,7 @@ function SolicitarAdopcion() {
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
                   className={errores.telefono ? "campo-error" : ""}
+                  placeholder="Solo números"
                 />
                 {errores.telefono && <span className="den-error-msg">{errores.telefono}</span>}
               </div>
@@ -239,6 +390,7 @@ function SolicitarAdopcion() {
           </div>
         )}
 
+        {/* Paso 1 - Información del hogar */}
         {paso === 1 && (
           <div className="den-seccion">
             <div className="den-sec-titulo">
@@ -281,6 +433,7 @@ function SolicitarAdopcion() {
           </div>
         )}
 
+        {/* Paso 2 - Experiencia con mascotas */}
         {paso === 2 && (
           <div className="den-seccion">
             <div className="den-sec-titulo">
@@ -304,6 +457,7 @@ function SolicitarAdopcion() {
                 value={experiencia}
                 onChange={(e) => setExperiencia(e.target.value)}
                 className={errores.experiencia ? "campo-error" : ""}
+                placeholder="Cuéntanos tu experiencia previa (si tienes)"
               />
               {errores.experiencia && <span className="den-error-msg">{errores.experiencia}</span>}
             </div>
@@ -315,12 +469,14 @@ function SolicitarAdopcion() {
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 className={errores.motivo ? "campo-error" : ""}
+                placeholder="Explícanos tu motivación"
               />
               {errores.motivo && <span className="den-error-msg">{errores.motivo}</span>}
             </div>
           </div>
         )}
 
+        {/* Paso 3 - Confirmación */}
         {paso === 3 && (
           <div className="den-seccion">
             <div className="den-sec-titulo">

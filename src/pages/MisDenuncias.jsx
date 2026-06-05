@@ -97,6 +97,10 @@ function MisDenuncias() {
   };
 
   const editarDenuncia = (denuncia) => {
+    if (denuncia.estado !== "Recibida") {
+      addToast("No puedes editar una denuncia que ya ha sido procesada", "warning");
+      return;
+    }
     setEditandoDenuncia(true);
     setFormEditDenuncia({
       tipoAnimal: denuncia.tipoAnimal || "",
@@ -127,6 +131,12 @@ function MisDenuncias() {
   };
 
   const ejecutarCancelarDenuncia = async (id) => {
+    const denuncia = denuncias.find(d => d.id === id);
+    if (!denuncia || denuncia.estado !== "Recibida") {
+      addToast("No se puede cancelar una denuncia que ya ha sido procesada", "warning");
+      setConfirmModal({ visible: false, onConfirm: null, message: "", itemId: null, tipo: null });
+      return;
+    }
     try {
       await updateDoc(doc(db, "denuncias", id), { estado: "Cancelada" });
       const user = auth.currentUser;
@@ -139,6 +149,13 @@ function MisDenuncias() {
   };
 
   const guardarEdicionDenuncia = async () => {
+    const denunciaActual = denuncias.find(d => d.id === denunciaSeleccionada.id);
+    if (denunciaActual?.estado !== "Recibida") {
+      addToast("No se puede editar porque la denuncia ya fue procesada", "error");
+      setDenunciaSeleccionada(null);
+      setEditandoDenuncia(false);
+      return;
+    }
     try {
       const updateData = {
         tipoAnimal: formEditDenuncia.tipoAnimal,
@@ -181,6 +198,10 @@ function MisDenuncias() {
   };
 
   const editarSolicitud = (solicitud) => {
+    if (solicitud.estado !== "Pendiente") {
+      addToast("No puedes editar una solicitud que ya ha sido procesada", "warning");
+      return;
+    }
     setEditandoSolicitud(true);
     setFormEditSolicitud({
       nombre: solicitud.nombre || "",
@@ -198,6 +219,12 @@ function MisDenuncias() {
   };
 
   const ejecutarCancelarSolicitud = async (id) => {
+    const solicitud = solicitudes.find(s => s.id === id);
+    if (!solicitud || solicitud.estado !== "Pendiente") {
+      addToast("No se puede cancelar una solicitud que ya ha sido procesada", "warning");
+      setConfirmModal({ visible: false, onConfirm: null, message: "", itemId: null, tipo: null });
+      return;
+    }
     try {
       await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Cancelada" });
       const user = auth.currentUser;
@@ -211,6 +238,13 @@ function MisDenuncias() {
 
   const guardarEdicionSolicitud = async () => {
     if (!solicitudSeleccionada) return;
+    const solicitudActual = solicitudes.find(s => s.id === solicitudSeleccionada.id);
+    if (solicitudActual?.estado !== "Pendiente") {
+      addToast("No se puede editar una solicitud que ya ha sido procesada", "error");
+      setSolicitudSeleccionada(null);
+      setEditandoSolicitud(false);
+      return;
+    }
     try {
       const updateData = {
         nombre: formEditSolicitud.nombre,
@@ -401,8 +435,12 @@ function MisDenuncias() {
                         <td>
                           <div className="md-acciones">
                             <button className="md-btn-detalle" onClick={() => verDetalleDenuncia(d)}>Detalle</button>
-                            <button className="md-btn-editar" onClick={() => editarDenuncia(d)}>Editar</button>
-                            <button className="md-btn-cancelar" onClick={() => setConfirmModal({ visible: true, onConfirm: ejecutarCancelarDenuncia, message: "¿Estás seguro de cancelar esta denuncia?", itemId: d.id, tipo: "denuncia" })}>Cancelar</button>
+                            {d.estado === "Recibida" && (
+                              <>
+                                <button className="md-btn-editar" onClick={() => editarDenuncia(d)}>Editar</button>
+                                <button className="md-btn-cancelar" onClick={() => setConfirmModal({ visible: true, onConfirm: ejecutarCancelarDenuncia, message: "¿Estás seguro de cancelar esta denuncia?", itemId: d.id, tipo: "denuncia" })}>Cancelar</button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -415,7 +453,7 @@ function MisDenuncias() {
         </>
       )}
 
-      {/* ========== TABLA SOLICITUDES - FECHA ELIMINADA DE LA COLUMNA ESTADO ========== */}
+      {/* ========== TABLA SOLICITUDES ========== */}
       {tabActiva === "adopciones" && (
         <>
           <div className="md-stats">
@@ -455,24 +493,17 @@ function MisDenuncias() {
                         <td>{s.telefono || "—"}</td>
                         <td>{s.ciudad || "—"}</td>
                         <td>
-                          {/* Solo el badge, sin fecha del encuentro */}
-                          <span className={`md-badge ${claseEstadoSolicitud(s.estado)}`}>
-                            {s.estado}
-                          </span>
+                          <span className={`md-badge ${claseEstadoSolicitud(s.estado)}`}>{s.estado}</span>
                         </td>
                         <td>{s.creadoEn?.toDate?.().toLocaleDateString() || "—"}</td>
                         <td>
                           <div className="md-acciones">
                             <button className="md-btn-detalle" onClick={() => verDetalleSolicitud(s)}>Detalle</button>
-                            <button className="md-btn-editar" onClick={() => editarSolicitud(s)}>Editar</button>
                             {s.estado === "Pendiente" && (
-                              <button className="md-btn-cancelar" onClick={() => setConfirmModal({ 
-                                visible: true, 
-                                onConfirm: ejecutarCancelarSolicitud, 
-                                message: "¿Cancelar esta solicitud de adopción?", 
-                                itemId: s.id, 
-                                tipo: "solicitud" 
-                              })}>Cancelar</button>
+                              <>
+                                <button className="md-btn-editar" onClick={() => editarSolicitud(s)}>Editar</button>
+                                <button className="md-btn-cancelar" onClick={() => setConfirmModal({ visible: true, onConfirm: ejecutarCancelarSolicitud, message: "¿Cancelar esta solicitud de adopción?", itemId: s.id, tipo: "solicitud" })}>Cancelar</button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -496,7 +527,6 @@ function MisDenuncias() {
               <button className="modal-cerrar" onClick={() => setDenunciaSeleccionada(null)}>✖</button>
             </div>
             <div className="modal-body">
-              {/* contenido del modal (se mantiene igual) */}
               <div className="detalle-seccion">
                 <h3><span>🐾</span> Animal</h3>
                 <div className="detalle-grid">
@@ -556,7 +586,9 @@ function MisDenuncias() {
                   <button className="btn-cancelar-modal" onClick={() => setDenunciaSeleccionada(null)}>Cancelar</button>
                 </>
               ) : (
-                <button className="btn-editar-modal" onClick={() => setEditandoDenuncia(true)}>Editar denuncia</button>
+                denunciaSeleccionada.estado === "Recibida" && (
+                  <button className="btn-editar-modal" onClick={() => setEditandoDenuncia(true)}>Editar denuncia</button>
+                )
               )}
             </div>
           </div>
@@ -573,7 +605,6 @@ function MisDenuncias() {
               <button className="modal-cerrar" onClick={() => setSolicitudSeleccionada(null)}>✖</button>
             </div>
             <div className="modal-body">
-              {/* contenido del modal de solicitud (se mantiene igual) */}
               <div className="detalle-seccion">
                 <h3><span>🐶</span> Animal solicitado</h3>
                 <div className="detalle-grid"><div><strong>Nombre:</strong> {solicitudSeleccionada.nombreAnimal || "—"}</div></div>
@@ -611,7 +642,9 @@ function MisDenuncias() {
                   <button className="btn-cancelar-modal" onClick={() => setSolicitudSeleccionada(null)}>Cancelar</button>
                 </>
               ) : (
-                <button className="btn-editar-modal" onClick={() => setEditandoSolicitud(true)}>Editar solicitud</button>
+                solicitudSeleccionada.estado === "Pendiente" && (
+                  <button className="btn-editar-modal" onClick={() => setEditandoSolicitud(true)}>Editar solicitud</button>
+                )
               )}
             </div>
           </div>

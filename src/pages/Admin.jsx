@@ -38,7 +38,7 @@ function Admin() {
   });
   const [editForm, setEditForm] = useState({});
 
-  // Sistema de toasts
+  // Toasts
   const [toasts, setToasts] = useState([]);
   const addToast = (message, type = "info") => {
     const id = Date.now();
@@ -138,21 +138,34 @@ function Admin() {
     }
   };
 
-  const aprobarSolicitud = async (id, solicitanteId, animalNombre) => {
-    try {
-      await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Aprobada" });
-      await crearNotificacion(
-        solicitanteId,
-        "✅ Solicitud aprobada",
-        `Tu solicitud para adoptar a ${animalNombre || "una mascota"} ha sido aprobada.`,
-        "aprobacion"
-      );
-      obtenerDatos();
-      addToast("Solicitud aprobada correctamente", "success");
-    } catch (error) {
-      addToast("Error al aprobar la solicitud", "error");
+const aprobarSolicitud = async (id, solicitanteId, animalNombre, animalId) => {
+  try {
+    // 1. Actualizar estado de la solicitud
+    await updateDoc(doc(db, "solicitudesAdopcion", id), { estado: "Aprobada" });
+
+    // 2. Si existe animalId, cambiar el estado de la publicación a "Adoptado"
+    if (animalId) {
+      await updateDoc(doc(db, "adopciones", animalId), {
+        estadoAdopcion: "Adoptado",
+        adoptanteId: solicitanteId,  // opcional: guardar quién adoptó
+        fechaAdopcion: new Date(),
+      }); 
     }
-  };
+
+    // 3. Notificar al solicitante
+    await crearNotificacion(
+      solicitanteId,
+      "✅ Solicitud aprobada",
+      `Tu solicitud para adoptar a ${animalNombre || "una mascota"} ha sido aprobada. La publicación ahora aparece como "Adoptado".`,
+      "aprobacion"
+    );
+
+    obtenerDatos();
+    addToast("Solicitud aprobada y publicación actualizada", "success");
+  } catch (error) {
+    addToast("Error al aprobar la solicitud", "error");
+  }
+};
 
   const rechazarSolicitud = async (id, solicitanteId, animalNombre) => {
     try {
@@ -334,6 +347,21 @@ function Admin() {
     );
   });
 
+  const getEstadoClase = (estado) => {
+    switch (estado) {
+      case "Recibida": return "estado-recibida";
+      case "En revisión": return "estado-revision";
+      case "Validada": return "estado-aprobada";
+      case "Escalada": return "estado-escalada";
+      case "Aprobada": return "estado-aprobada";
+      case "Rechazada": return "estado-escalada";
+      case "Pendiente": return "estado-pendiente";
+      case "Encuentro programado": return "estado-encuentro";
+      case "Cancelada": return "estado-cancelada";
+      default: return "estado-recibida";
+    }
+  };
+
   return (
     <div className="admin-dashboard">
       <div className="toast-container">
@@ -345,7 +373,7 @@ function Admin() {
         ))}
       </div>
 
-      {/* MODAL DE EDICIÓN (completo) */}
+      {/* MODAL DE EDICIÓN (contenido completo) */}
       {modalEdicion.visible && (
         <div className="modal-overlay" onClick={() => setModalEdicion({ visible: false, tipo: null, data: null })}>
           <div className="modal-content modal-profesional" onClick={(e) => e.stopPropagation()}>
@@ -567,11 +595,16 @@ function Admin() {
       {/* TABLA DENUNCIAS */}
       {tabActiva === "denuncias" && (
         <div className="admin-table-card">
-          <h2>📋 Denuncias Registradas</h2>
+          <h2> Denuncias Registradas</h2>
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Animal</th><th>Maltrato</th><th>Infractor</th><th>Documento</th><th>Estado</th><th>Acciones</th>
+                <th>Animal</th>
+                <th>Maltrato</th>
+                <th>Infractor</th>
+                <th>Documento</th>
+                <th>Estado</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -581,7 +614,11 @@ function Admin() {
                   <td>{d.tipoMaltrato}</td>
                   <td>{d.presuntoInfractor?.nombre || "No registrado"}</td>
                   <td>{d.presuntoInfractor?.documento || "No registrado"}</td>
-                  <td>{d.estado}</td>
+                  <td>
+                    <span className={`estado-badge ${getEstadoClase(d.estado)}`}>
+                      {d.estado}
+                    </span>
+                  </td>
                   <td className="acciones-botones">
                     <button className="btn-editar" onClick={() => abrirEdicion("denuncia", d)}>Editar</button>
                     <button className="btn-revisar" onClick={() => cambiarEstadoDenuncia(d.id, "En revisión", d)}>Revisar</button>
@@ -601,20 +638,26 @@ function Admin() {
           <h2>🐾 Publicaciones de Adopción</h2>
           <table className="admin-table">
             <thead>
-              <tr><th>Foto</th><th>Animal</th><th>Ciudad</th><th>Publicación</th><th>Acciones</th></tr>
+              <tr>
+                <th>Foto</th>
+                <th>Animal</th>
+                <th>Ciudad</th>
+                <th>Publicación</th>
+                <th>Acciones</th>
+              </tr>
             </thead>
             <tbody>
               {adopcionesFiltradas.map((a) => (
                 <tr key={a.id}>
                   <td className="td-foto">
                     {a.fotos?.length > 0 ? (
-                      <img src={a.fotos[0]} className="admin-thumb" alt="" />
+                      <a href={a.fotos[0]} target="_blank" rel="noreferrer" className="foto-link">Ver foto</a>
                     ) : "Sin foto"}
                   </td>
                   <td>{a.nombreAnimal}</td>
                   <td>{a.ciudad}</td>
                   <td>
-                    <span className={`estado-badge ${a.estadoPublicacion === "Aprobada" ? "estado-aprobada" : a.estadoPublicacion === "Rechazada" ? "estado-rechazada" : "estado-pendiente"}`}>
+                    <span className={`estado-badge ${getEstadoClase(a.estadoPublicacion)}`}>
                       {a.estadoPublicacion}
                     </span>
                   </td>
@@ -635,14 +678,23 @@ function Admin() {
         <div className="admin-table-card">
           <h2>👥 Usuarios Registrados</h2>
           <table className="admin-table">
-            <thead><tr><th>Nombre</th><th>Email</th><th>Documento</th><th>Acciones</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Documento</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
             <tbody>
               {usuariosFiltrados.map((u) => (
                 <tr key={u.id}>
                   <td>{u.nombre || "Sin nombre"}</td>
                   <td>{u.email}</td>
                   <td>{u.documento}</td>
-                  <td className="acciones-botones"><button className="btn-editar" onClick={() => abrirEdicion("usuario", u)}>Editar</button></td>
+                  <td className="acciones-botones">
+                    <button className="btn-editar" onClick={() => abrirEdicion("usuario", u)}>Editar</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -650,7 +702,7 @@ function Admin() {
         </div>
       )}
 
-      {/* TABLA SOLICITUDES - FECHA EN COLUMNA SEPARADA */}
+      {/* TABLA SOLICITUDES */}
       {tabActiva === "solicitudes" && (
         <div className="admin-table-card">
           <h2>📋 Solicitudes de Adopción</h2>
@@ -667,39 +719,28 @@ function Admin() {
               </tr>
             </thead>
             <tbody>
-              {solicitudesFiltradas.map((s) => {
-                let estadoClase = "";
-                if (s.estado === "Aprobada") estadoClase = "estado-aprobada";
-                else if (s.estado === "Rechazada") estadoClase = "estado-rechazada";
-                else if (s.estado === "Pendiente") estadoClase = "estado-pendiente";
-                else if (s.estado === "Encuentro programado") estadoClase = "estado-encuentro";
-                else if (s.estado === "Cancelada") estadoClase = "estado-cancelada";
-
-                return (
-                  <tr key={s.id}>
-                    <td><strong>{s.nombreAnimal || "No especificado"}</strong></td>
-                    <td>{s.nombre || s.solicitanteEmail || "Anónimo"}</td>
-                    <td>{s.telefono || "—"}</td>
-                    <td>{s.ciudad || "—"}</td>
-                    <td>
-                      <span className={`estado-badge ${estadoClase}`}>
-                        {s.estado}
-                      </span>
-                    </td>
-                    <td>
-                      {s.fechaEncuentro
-                        ? new Date(s.fechaEncuentro).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td className="acciones-botones">
-                      <button className="btn-editar" onClick={() => abrirEdicion("solicitud", s)}>Editar</button>
-                      <button className="btn-aprobar" onClick={() => aprobarSolicitud(s.id, s.solicitanteId, s.nombreAnimal)}>Aprobar</button>
-                      <button className="btn-rechazar" onClick={() => rechazarSolicitud(s.id, s.solicitanteId, s.nombreAnimal)}>Rechazar</button>
-                      <button className="btn-agendar" onClick={() => abrirModalFecha(s)}>Agendar</button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {solicitudesFiltradas.map((s) => (
+                <tr key={s.id}>
+                  <td><strong>{s.nombreAnimal || "No especificado"}</strong></td>
+                  <td>{s.nombre || s.solicitanteEmail || "Anónimo"}</td>
+                  <td>{s.telefono || "—"}</td>
+                  <td>{s.ciudad || "—"}</td>
+                  <td>
+                    <span className={`estado-badge ${getEstadoClase(s.estado)}`}>
+                      {s.estado}
+                    </span>
+                  </td>
+                  <td>
+                    {s.fechaEncuentro ? new Date(s.fechaEncuentro).toLocaleString() : "—"}
+                  </td>
+                  <td className="acciones-botones">
+                    <button className="btn-editar" onClick={() => abrirEdicion("solicitud", s)}>Editar</button>
+                   <button className="btn-aprobar" onClick={() => aprobarSolicitud(s.id, s.solicitanteId, s.nombreAnimal, s.animalId)}>Aprobar</button>
+                    <button className="btn-rechazar" onClick={() => rechazarSolicitud(s.id, s.solicitanteId, s.nombreAnimal)}>Rechazar</button>
+                    <button className="btn-agendar" onClick={() => abrirModalFecha(s)}>Agendar</button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
